@@ -1,6 +1,7 @@
 // Importación de módulos
 const express = require('express');
 const bodyParser = require('body-parser');
+const multer = require('multer');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -159,5 +160,46 @@ app.post('/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Error al restablecer la contraseña:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({storage: storage});
+
+app.put('/users/:username', upload.single('imagenperfil'), async (req, res) => {
+
+  console.log('PUT /username/:username');
+  console.log('req.params:', req.params);
+  console.log('req.body:', req.body);
+
+  const username = req.params.username; 
+  const { descripcion, experiencia, proyectosrealizados } = req.body;
+
+  try {
+    // Validaciones de los campos
+    if (!descripcion || isNaN(experiencia) || isNaN(proyectosrealizados)) {
+      res.status(400).json({ error: 'Los datos proporcionados son inválidos.' });
+      return;
+    }
+    if (experiencia < 0 || experiencia > 100) {
+      res.status(400).json({ error: 'El valor de años de experiencia debe estar entre 0 y 100.' });
+      return;
+    }
+    
+    if (proyectosrealizados < 0 || proyectosrealizados > 1000) {
+      res.status(400).json({ error: 'El valor de proyectos realizados debe estar entre 0 y 1000.' });
+      return;
+    }
+    // Completa el perfil del usuario  en la base de datos
+    const updateQuery = "\n      UPDATE users\n      SET descripcion = $1, experiencia = $2, proyectosrealizados = $3, imagenperfil = $4 \n      WHERE username = $5 \n    ";
+    
+    const imagenperfil = req.file.buffer;
+    
+    await pool.query(updateQuery, [descripcion, experiencia, proyectosrealizados, imagenperfil, username]);
+
+    res.status(200).json({ mensaje: 'Perfil completado con éxito' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al completar el perfil' });
   }
 });
