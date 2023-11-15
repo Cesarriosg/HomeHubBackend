@@ -54,36 +54,30 @@ app.post('/reg', async (req, res) => {
 
 // Manejo y funcion de la ruta "/login" (Inicio de sesión)
 app.post('/login', async (req, res) => {
-  const { user, password } = req.body;
-
-  const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [user]);
-
-  if (existingUser.rows.length > 0) {
-    return res.status(400).json({ message: 'usario encontrado' });
-    console.log("Correo ya en uso")
-  }
+  const { email, password } = req.body;
 
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT * FROM usuarios WHERE usuario = $1', [user]);
-    client.release();
+    const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
-    if (result.rows.length === 1) {
-      const user = result.rows[0];
-      const passwordMatch = await bcrypt.compare(password, user.password);
-
-      if (passwordMatch) {
-        res.sendStatus(200);
-      } else {
-        res.sendStatus(401);
-      }
-    } else {
-      // Usuario no encontrado, devuelve un estado no autorizado
-      res.sendStatus(401);
+    if (user.rows.length === 0) {
+      console.log('Usuario no encontrado:', email);
+      return res.status(401).json({ message: 'Usuario no encontrado' });
     }
+
+    const passwordMatch = await bcrypt.compare(password, user.rows[0].password);
+
+    if (!passwordMatch) {
+      console.log('Contraseña incorrecta para el usuario:', email);
+      return res.status(401).json({ message: 'Contraseña incorrecta' });
+    }
+
+    const token = jwt.sign({ userId: user.rows[0].id }, 'your-secret-key', { expiresIn: '1h' });
+
+    console.log('Inicio de sesión exitoso para el usuario:', email);
+    res.json({ message: 'Inicio de sesión exitoso', token });
   } catch (error) {
-    console.error('Error en el inicio de sesión:', error);
-    res.sendStatus(500); // Error interno del servidor
+    console.error('Error al iniciar sesión', error);
+    res.status(500).json({ message: 'Error al iniciar sesión', error: error.message });
   }
 });
 
