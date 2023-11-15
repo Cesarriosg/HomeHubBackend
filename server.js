@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
 
 // Configuración de Express
@@ -85,7 +86,16 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Manejo y funcion de la ruta "/recovey" (recuperacion de contraseña)
+// Configuración del transporte de nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'correo@gmail.com',
+    pass: 'contraseña'
+  }
+});
+
+// Manejo y funcion de la ruta "/forgot-password" (recuperacion de contraseña)
 app.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
 
@@ -97,15 +107,38 @@ app.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ message: 'No se encontró ninguna cuenta asociada con este correo electrónico.' });
     }
 
-    // Generar un token de restablecimiento de contraseña válido por un tiempo limitado (por ejemplo, 1 hora)
+    // Generar un token de restablecimiento de contraseña válido por un tiempo limitado
     const token = jwt.sign({ userId: user.rows[0].id }, 'claveSuperSecretaXD', { expiresIn: '1h' });
 
-    // TODO: Enviar el token por correo electrónico al usuario
-    // Puedes utilizar nodemailer u otro servicio para enviar correos electrónicos aquí
+    async function sendResetEmail(email, token) {
+      const mailOptions = {
+        from: 'correo@gmail.com',
+        to: email,
+        subject: 'Restablecimiento de Contraseña',
+        text: `Haz clic en el siguiente enlace para restablecer tu contraseña: http://tuaplicacion.com/reset-password?token=${token}`
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Correo electrónico de restablecimiento enviado a ${email}`);
+      } catch (error) {
+        console.error('Error al enviar el correo electrónico:', error);
+        // Puedes lanzar un error personalizado para manejarlo en el bloque catch de la ruta principal
+        throw new Error('EMAIL_SENDING_ERROR');
+      }
+    }
+
+    module.exports = { sendResetEmail };
 
     res.status(200).json({ message: 'Se ha enviado un enlace de restablecimiento de contraseña por correo electrónico.' });
   } catch (error) {
     console.error('Error al solicitar restablecimiento de contraseña:', error);
+
+    // Manejar específicamente los errores relacionados con el envío de correo electrónico
+    if (error.code === 'EMAIL_SENDING_ERROR') {
+      return res.status(500).json({ message: 'Error al enviar el correo electrónico con el enlace de restablecimiento de contraseña.' });
+    }
+
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
