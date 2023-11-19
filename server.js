@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
+const { callbackPromise } = require('nodemailer/lib/shared');
 
 // Configuración de Express
 const app = express();
@@ -85,8 +86,8 @@ app.post('/login', async (req, res) => {
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'correo@gmail.com',
-    pass: 'contraseña'
+    user: 'proyectohomehub@gmail.com',
+    pass: 'zwxn zmja rfjz kryh'
   }
 });
 
@@ -107,7 +108,7 @@ app.post('/forgot-password', async (req, res) => {
 
     async function sendResetEmail(email, token) {
       const mailOptions = {
-        from: 'correo@gmail.com',
+        from: 'proyectohomehub@gmail.com',
         to: email,
         subject: 'Restablecimiento de Contraseña',
         text: `Haz clic en el siguiente enlace para restablecer tu contraseña: http://tuaplicacion.com/reset-password?token=${token}`
