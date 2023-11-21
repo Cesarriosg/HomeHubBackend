@@ -111,7 +111,7 @@ app.post('/forgot-password', async (req, res) => {
         from: 'proyectohomehub@gmail.com',
         to: email,
         subject: 'Restablecimiento de Contraseña',
-        text: `Haz clic en el siguiente enlace para restablecer tu contraseña: http://tuaplicacion.com/reset-password?token=${token}`
+        text: `Haz clic en el siguiente enlace para restablecer tu contraseña` //: http://tuaplicacion.com/reset-password?token=${token}
       };
 
       try {
@@ -196,5 +196,41 @@ app.put('/users/:username', upload.single('imagenperfil'), async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al completar el perfil' });
+  }
+});
+
+// Ruta para cambiar la contraseña
+app.post('/change-password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id; // Suponiendo que tienes información del usuario en el objeto req.user después de la autenticación
+
+  try {
+    // Verificar la contraseña actual del usuario
+    const user = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.rows[0].password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'La contraseña actual no es válida.' });
+    }
+
+    // Generar un token de restablecimiento de contraseña para la nueva contraseña
+    const token = jwt.sign({ userId }, 'claveSuperSecretaXD', { expiresIn: '1h' });
+
+    // Cambiar la contraseña en la base de datos
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+
+    // Enviar el token por correo electrónico al usuario
+    await sendResetEmail(user.rows[0].email, token);
+
+    res.status(200).json({ message: 'Contraseña cambiada con éxito.' });
+  } catch (error) {
+    console.error('Error al cambiar la contraseña:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
