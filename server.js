@@ -335,3 +335,36 @@ app.post('/change-password', async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
+
+// Ruta para obtener proyectos de un usuario específico
+app.get('/users/:username/proyectos', async (req, res) => {
+  const username = req.params.username;
+
+  try {
+    // Obtener el ID del usuario
+    const userIdQuery = 'SELECT id FROM users WHERE username = $1';
+    const userIdResult = await pool.query(userIdQuery, [username]);
+
+    if (userIdResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const userId = userIdResult.rows[0].id;
+
+    // Obtener proyectos asociados al usuario
+    const proyectosQuery = 'SELECT * FROM proyectos WHERE user_id = $1';
+    const proyectosResult = await pool.query(proyectosQuery, [userId]);
+
+    res.status(200).json({ proyectos: proyectosResult.rows });
+  } catch (error) {
+    console.error('Error al obtener proyectos del usuario:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta protegida para obtener proyectos de un usuario específico
+// solo los usuarios autenticados puedan ver sus proyectos,
+//se puede proteger esta ruta utilizando el middleware de autenticación que ya se ha creado (authenticateUser).
+app.get('/users/:username/proyectos', authenticateUser, async (req, res) => {
+  // ... (resto del código)
+});
