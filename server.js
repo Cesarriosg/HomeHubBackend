@@ -181,7 +181,7 @@ app.put('/users/:username/completar', upload.single('imagenperfil'), async (req,
   console.log('req.params:', req.params);
   console.log('req.body:', req.body);
 
-  const username = req.params.username; 
+  const username = req.params.username;
   const { descripcion, experiencia, proyectosrealizados } = req.body;
 
   try {
@@ -194,16 +194,16 @@ app.put('/users/:username/completar', upload.single('imagenperfil'), async (req,
       res.status(400).json({ error: 'El valor de años de experiencia debe estar entre 0 y 100.' });
       return;
     }
-    
+
     if (proyectosrealizados < 0 || proyectosrealizados > 1000) {
       res.status(400).json({ error: 'El valor de proyectos realizados debe estar entre 0 y 1000.' });
       return;
     }
     // Completa el perfil del usuario  en la base de datos
     const updateQuery = "\n      UPDATE users\n      SET descripcion = $1, experiencia = $2, proyectosrealizados = $3, imagenperfil = $4 \n      WHERE username = $5 \n    ";
-    
+
     const imagenperfil = req.file.buffer;
-    
+
     await pool.query(updateQuery, [descripcion, experiencia, proyectosrealizados, imagenperfil, username]);
 
     res.status(200).json({ mensaje: 'Perfil completado con éxito' });
@@ -258,7 +258,7 @@ app.put('/users/:username/editar', authenticateUser, authorizeEditProfile, uploa
   }
 
   try {
-    
+
     if (!name || !email || !descripcion || isNaN(experiencia) || isNaN(proyectosrealizados)) {
       res.status(400).json({ error: 'Los datos proporcionados son inválidos.' });
       return;
@@ -267,7 +267,7 @@ app.put('/users/:username/editar', authenticateUser, authorizeEditProfile, uploa
       res.status(400).json({ error: 'El valor de años de experiencia debe estar entre 0 y 100.' });
       return;
     }
-    
+
     if (proyectosrealizados < 0 || proyectosrealizados > 1000) {
       res.status(400).json({ error: 'El valor de proyectos realizados debe estar entre 0 y 1000.' });
       return;
@@ -366,5 +366,72 @@ app.get('/users/:username/proyectos', async (req, res) => {
 // solo los usuarios autenticados puedan ver sus proyectos,
 //se puede proteger esta ruta utilizando el middleware de autenticación que ya se ha creado (authenticateUser).
 app.get('/users/:username/proyectos', authenticateUser, async (req, res) => {
-  // ... (resto del código)
+  //Alguna ruta acá adentro xd
+});
+
+// Ruta para obtener asesorías de un usuario en un estado específico
+app.get('/users/:username/asesorias/:estado', authenticateUser, async (req, res) => {
+  const username = req.params.username;
+  const estado = req.params.estado;
+
+  try {
+    // Obtener el ID del usuario
+    const userIdQuery = 'SELECT id FROM users WHERE username = $1';
+    const userIdResult = await pool.query(userIdQuery, [username]);
+
+    if (userIdResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    const userId = userIdResult.rows[0].id;
+
+    // Obtener asesorías asociadas al usuario en un estado específico
+    const asesoriasQuery = 'SELECT * FROM asesorias WHERE user_id = $1 AND estado = $2';
+    const asesoriasResult = await pool.query(asesoriasQuery, [userId, estado]);
+
+    res.status(200).json({ asesorias: asesoriasResult.rows });
+  } catch (error) {
+    console.error('Error al obtener asesorías del usuario en un estado específico:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+});
+
+// Ruta para el registro de administradores
+app.post('/register/admin', async (req, res) => {
+  const { user, name, password, email, phone } = req.body;
+
+  try {
+    // Asegurarse de que el usuario que realiza la solicitud es un administrador
+
+    // Middleware para autenticación de administradores
+    const authenticateAdmin = (req, res, next) => {
+      const userType = req.user.tipo_usuario;
+
+      if (userType !== 'admin') {
+        return res.status(403).json({ message: 'Acceso no autorizado. Se requieren permisos de administrador.' });
+      }
+
+      next();
+    };
+
+    // Ruta protegida para realizar acciones de administrador
+    app.get('/admin/action', authenticateUser, authenticateAdmin, (req, res) => {
+      // La lógica de esta ruta solo se ejecutará si el usuario es autenticado y es un administrador
+      res.json({ message: 'Acción de administrador realizada con éxito.' });
+    });
+
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const tipoUsuario = 'admin';
+
+    const result = await pool.query(
+      'INSERT INTO users (username, name, password, email, phone, tipo_usuario) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [user, name, hashedPassword, email, phone, tipoUsuario]
+    );
+
+    res.status(201).json({ message: 'Administrador registrado exitosamente', user: result.rows[0] });
+  } catch (error) {
+    console.error('Error al registrar administrador:', error);
+    res.status(500).json({ message: 'Error al registrar administrador' });
+  }
 });
